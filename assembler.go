@@ -21,7 +21,15 @@ type Reassembler[T any, S constraints.Integer] struct {
 	out chan T
 }
 
-func (r *Reassembler[T, S]) In(pkg T) (err error) {
+func (r *Reassembler[T, S]) In() chan T {
+	return r.in
+}
+
+func (r *Reassembler[T, S]) Out() chan T {
+	return r.out
+}
+
+func (r *Reassembler[T, S]) Input(pkg T) (err error) {
 	defer func() {
 		if re := recover(); re != nil {
 			err = fmt.Errorf("assembler '%s': panic occurred while sending package: %v", r.name, re)
@@ -31,7 +39,7 @@ func (r *Reassembler[T, S]) In(pkg T) (err error) {
 	return nil
 }
 
-func (r *Reassembler[T, S]) Out() (T, bool) {
+func (r *Reassembler[T, S]) Output() (T, bool) {
 	pkg, ok := <-r.out
 	return pkg, ok
 }
@@ -48,6 +56,11 @@ func (r *Reassembler[T, S]) handlePackage(pkg T) {
 			r.dropCallback(pkg, issue)
 		}
 	}()
+
+	if r.sequenceFunc == nil {
+		issue = NewIssue(IssueTypeSequenceFuncNotSet, r.nextSeq, fmt.Errorf("assembler '%s': sequence function is not set", r.name))
+		return
+	}
 
 	seq := r.sequenceFunc(pkg)
 
@@ -92,10 +105,7 @@ func (r *Reassembler[T, S]) OnDrop(callback func(T, *Issue[S])) {
 	r.dropCallback = callback
 }
 
-func NewReassembler[T any, S constraints.Integer](name string, sequenceFunc func(T) S) (*Reassembler[T, S], error) {
-	if sequenceFunc == nil {
-		return nil, fmt.Errorf("assembler '%s': sequence function is not set", name)
-	}
+func NewReassembler[T any, S constraints.Integer](name string, sequenceFunc func(T) S) *Reassembler[T, S] {
 
 	return &Reassembler[T, S]{
 		name:         name,
@@ -106,5 +116,5 @@ func NewReassembler[T any, S constraints.Integer](name string, sequenceFunc func
 		dropCallback: func(t T, i *Issue[S]) {
 			fmt.Printf("[!]Assembler '%s': dropped package due to issue: %v\n", name, i.Err)
 		},
-	}, nil
+	}
 }

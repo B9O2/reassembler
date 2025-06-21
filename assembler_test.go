@@ -28,17 +28,13 @@ func (ps Packages) Data() []byte {
 	return data
 }
 
+var F func(pkg Package) uint32
+
 func TestNewReassembler(t *testing.T) {
-	rawData := []byte("Hello, Assembler!")
+	rawData := []byte("Hello, Reassembler!")
 
-	assembler, err := NewReassembler("order", func(p Package) uint32 {
-		return p.Sequence
-	})
+	assembler := NewReassembler("order", F)
 
-	if err != nil {
-		fmt.Println("Error creating reassembler:", err)
-		return
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	assembler.Start(ctx, 0)
 
@@ -60,17 +56,16 @@ func TestNewReassembler(t *testing.T) {
 	fmt.Println(string(packages.Data()))
 
 	go func() {
+		in := assembler.In()
 		for _, pkg := range packages {
-			if err := assembler.In(pkg); err != nil {
-				fmt.Printf("- Error sending package: %v\n", err)
-				break
-			}
+			in <- pkg
 		}
 		cancel()
 	}()
 
 	received := bytes.NewBuffer(nil)
-	for pkg, ok := assembler.Out(); ok; pkg, ok = assembler.Out() {
+	out := assembler.Out()
+	for pkg := range out {
 		//fmt.Printf("- Received package: Sequence=%d, Data=%c\n", pkg.Sequence, pkg.Data)
 		received.WriteByte(pkg.Data)
 

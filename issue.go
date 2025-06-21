@@ -4,6 +4,7 @@ type IssueType uint
 
 const (
 	IssueTypeUnknown IssueType = iota
+	IssueTypeSequenceFuncNotSet
 	IssueTypePackageLessThanNextSeq
 	IssueTypePanicOccurred
 )
